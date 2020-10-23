@@ -66,6 +66,8 @@ from swift3.utils import LOGGER, unique_id, MULTIUPLOAD_SUFFIX, S3Timestamp, \
     log_s3api_command, sysmeta_header
 from swift3.etree import Element, SubElement, fromstring, tostring, \
     XMLSyntaxError, DocumentInvalid
+from swift3.controllers.tagging import OBJECT_TAGGING_HEADER, \
+    HTTP_HEADER_TAGGING_KEY, convert_urlquery_to_xml
 from swift3.cfg import CONF
 
 DEFAULT_MAX_PARTS_LISTING = 1000
@@ -462,6 +464,11 @@ class UploadsController(Controller):
 
         obj = '%s/%s' % (req.object_name, upload_id)
 
+        if HTTP_HEADER_TAGGING_KEY in req.headers:
+            tagging = convert_urlquery_to_xml(
+                req.headers.get(HTTP_HEADER_TAGGING_KEY))
+            req.headers[OBJECT_TAGGING_HEADER] = tagging
+
         req.headers.pop('Etag', None)
         req.headers.pop('Content-Md5', None)
         req.environ['oio.ephemeral_object'] = True
@@ -650,6 +657,10 @@ class UploadController(Controller):
                 headers['x-object-meta-' + _key[11:]] = val
             elif _key == 'content-type':
                 headers['Content-Type'] = val
+        for key, val in resp.sysmeta_headers.items():
+            _key = key.lower()
+            if _key == OBJECT_TAGGING_HEADER.lower():
+                headers[key] = val
 
         # Query for the objects in the segments area to make sure it completed
         query = {
