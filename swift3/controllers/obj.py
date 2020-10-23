@@ -25,6 +25,8 @@ from swift3.utils import S3Timestamp, VERSIONING_SUFFIX, \
 from swift3.controllers.base import Controller
 from swift3.controllers.cors import get_cors, cors_fill_headers, \
     CORS_ALLOWED_HTTP_METHOD
+from swift3.controllers.tagging import OBJECT_TAGGING_HEADER, \
+    HTTP_HEADER_TAGGING_KEY, convert_urlquery_to_xml
 from swift3.response import S3NotImplemented, InvalidRange, NoSuchKey, \
     InvalidArgument, CORSForbidden, HTTPOk, CORSInvalidAccessControlRequest, \
     CORSOriginMissing
@@ -170,6 +172,12 @@ class ObjectController(Controller):
             raise InvalidArgument('x-amz-copy-source-range',
                                   req.headers['X-Amz-Copy-Source-Range'],
                                   'Illegal copy header')
+
+        if HTTP_HEADER_TAGGING_KEY in req.headers:
+            tagging = convert_urlquery_to_xml(
+                req.headers.pop(HTTP_HEADER_TAGGING_KEY))
+            req.headers[OBJECT_TAGGING_HEADER] = tagging
+
         req.check_copy_source(self.app)
         resp = req.get_response(self.app)
 

@@ -24,6 +24,7 @@ from mock import patch
 from swift.common import swob
 from swift.common.swob import Request
 
+from swift3.controllers import tagging
 from swift3.test.unit import Swift3TestCase
 from swift3.test.unit.test_s3_acl import s3acl
 from swift3.subresource import ACL, User, encode_acl, Owner, Grant
@@ -1117,6 +1118,32 @@ class TestSwift3Obj(Swift3TestCase):
         status, headers, body = self._test_object_copy_for_s3acl(
             'test:write', 'READ', src_path='')
         self.assertEqual(status.split()[0], '400')
+
+    @s3acl
+    def test_object_PUT_tagging(self):
+        etag = self.response_headers['etag']
+        content_md5 = etag.decode('hex').encode('base64').strip()
+
+        req = Request.blank(
+            '/bucket/object',
+            environ={'REQUEST_METHOD': 'PUT'},
+            headers={'Authorization': 'AWS test:tester:hmac',
+                     'x-amz-storage-class': 'STANDARD',
+                     'Content-MD5': content_md5,
+                     'Date': self.get_date_header(),
+                     'x-amz-tagging': 'a=&b='},
+            body=self.object_body)
+        req.date = datetime.now()
+        req.content_type = 'text/plain'
+        status, headers, body = self.call_swift3(req)
+        self.assertEqual(status.split()[0], '200')
+        # Check that swift3 returns an etag header.
+        self.assertEqual(headers['etag'], '"%s"' % etag)
+
+        _, _, headers = self.swift.calls_with_headers[-1]
+        # Check that swift3 converts a Content-MD5 header into an etag.
+        self.assertEqual(headers['etag'], etag)
+        self.assertIn(tagging.OBJECT_TAGGING_HEADER, headers)
 
 
 class TestSwift3ObjNonUTC(TestSwift3Obj):
