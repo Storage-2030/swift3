@@ -20,12 +20,12 @@ from swift.common.utils import public
 from swift3.controllers.base import Controller, bucket_operation, \
     check_container_existence
 from swift3.etree import fromstring, DocumentInvalid, XMLSyntaxError
+from swift3.iam import check_iam_access
 from swift3.response import HTTPOk, HTTPNoContent, MalformedXML, \
     NoSuchCORSConfiguration, CORSInvalidRequest
 
-from swift3.utils import LOGGER, sysmeta_header, log_s3api_command
-
-VERSION_ID_HEADER = 'X-Object-Sysmeta-Version-Id'
+from swift3.utils import LOGGER, sysmeta_header, log_s3api_command, \
+    convert_response
 
 MAX_CORS_BODY_SIZE = 10240
 
@@ -140,32 +140,17 @@ class CorsController(Controller):
 
     """
 
-    @staticmethod
-    def convert_response(req, resp, success_code, response_class):
-        """
-        Convert a successful response into another one with a different code.
-
-        This is required because the S3 protocol does not expect the same
-        response codes as the ones returned by the swift backend.
-        """
-        if resp.status_int == success_code:
-            headers = dict()
-            if req.object_name:
-                headers['x-amz-version-id'] = \
-                    resp.sw_headers[VERSION_ID_HEADER]
-            return response_class(headers=headers)
-        return resp
-
     @public
     @bucket_operation
     @check_container_existence
+    @check_iam_access('s3:GetBucketCORS')
     def GET(self, req):  # pylint: disable=invalid-name
         """
         Handles GET Bucket CORS.
         """
         log_s3api_command(req, 'get-bucket-cors')
-        sysmeta = req.get_container_info(self.app).get('sysmeta', {})
-        body = sysmeta.get('swift3-cors')
+        resp = req.get_response(self.app, method='HEAD')
+        body = resp.sysmeta_headers.get(BUCKET_CORS_HEADER)
         if not body:
             raise NoSuchCORSConfiguration
         return HTTPOk(body=body, content_type='application/xml')
@@ -173,6 +158,7 @@ class CorsController(Controller):
     @public
     @bucket_operation
     @check_container_existence
+    @check_iam_access('s3:PutBucketCORS')
     def PUT(self, req):  # pylint: disable=invalid-name
         """
         Handles PUT Bucket CORS.
@@ -191,19 +177,18 @@ class CorsController(Controller):
         check_cors_rule(data)
 
         req.headers[BUCKET_CORS_HEADER] = xml
-        resp = req._get_response(self.app, 'POST',
-                                 req.container_name, None)
-        return self.convert_response(req, resp, 204, HTTPOk)
+        resp = req.get_response(self.app, 'POST')
+        return convert_response(req, resp, 204, HTTPOk)
 
     @public
     @bucket_operation
     @check_container_existence
+    @check_iam_access('s3:PutBucketCORS')  # No specific permission for DELETE
     def DELETE(self, req):  # pylint: disable=invalid-name
         """
         Handles DELETE Bucket CORS.
         """
         log_s3api_command(req, 'delete-bucket-cors')
         req.headers[BUCKET_CORS_HEADER] = ''
-        resp = req._get_response(self.app, 'POST',
-                                 req.container_name, None)
-        return self.convert_response(req, resp, 202, HTTPNoContent)
+        resp = req.get_response(self.app, 'POST')
+        return convert_response(req, resp, 202, HTTPNoContent)

@@ -18,8 +18,10 @@ from swift.common.utils import public
 from swift3.controllers.base import Controller, bucket_operation
 from swift3.etree import Element, tostring, fromstring, XMLSyntaxError, \
     DocumentInvalid, SubElement
+from swift3.iam import check_iam_access
 from swift3.response import HTTPOk, NoSuchBucket, MalformedXML
-from swift3.utils import LOGGER, VERSIONING_SUFFIX, log_s3api_command
+from swift3.utils import LOGGER, VERSIONING_SUFFIX, convert_response, \
+    log_s3api_command
 
 MAX_PUT_VERSIONING_BODY_SIZE = 10240
 
@@ -35,6 +37,7 @@ class VersioningController(Controller):
     """
     @public
     @bucket_operation
+    @check_iam_access('s3:GetBucketVersioning')
     def GET(self, req):
         """
         Handles GET Bucket versioning.
@@ -66,6 +69,7 @@ class VersioningController(Controller):
 
     @public
     @bucket_operation
+    @check_iam_access('s3:PutBucketVersioning')
     def PUT(self, req):
         """
         Handles PUT Bucket versioning.
@@ -98,6 +102,6 @@ class VersioningController(Controller):
             req.headers['X-Remove-History-Location'] = 'true'
         # Set the container back to what it originally was
         req.container_name = req.container_name[:-len(VERSIONING_SUFFIX)]
-        req.get_response(self.app, 'POST')
+        resp = req.get_response(self.app, 'POST')
 
-        return HTTPOk()
+        return convert_response(req, resp, 204, HTTPOk)

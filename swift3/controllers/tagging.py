@@ -20,6 +20,7 @@ from swift.common.utils import close_if_possible, public
 from swift3.controllers.base import Controller, check_container_existence
 from swift3.etree import fromstring, tostring, DocumentInvalid, \
     Element, SubElement, XMLSyntaxError
+from swift3.iam import check_iam_access
 from swift3.response import HTTPNoContent, HTTPOk, MalformedXML, \
     NoSuchTagSet, InvalidArgument
 from swift3.utils import sysmeta_header
@@ -74,12 +75,13 @@ class TaggingController(Controller):
 
     @public
     @check_container_existence
+    @check_iam_access('s3:GetObjectTagging', 's3:GetBucketTagging')
     def GET(self, req):  # pylint: disable=invalid-name
         """
         Handles GET Bucket tagging and GET Object tagging.
         """
-        resp = req._get_versioned_response(self.app, 'HEAD',
-                                           req.container_name, req.object_name)
+        resp = req.get_versioned_response(self.app, 'HEAD',
+                                          req.container_name, req.object_name)
         headers = dict()
         if req.is_object_request:
             body = resp.sysmeta_headers.get(OBJECT_TAGGING_HEADER)
@@ -103,6 +105,7 @@ class TaggingController(Controller):
 
     @public
     @check_container_existence
+    @check_iam_access('s3:PutObjectTagging', 's3:PutBucketTagging')
     def PUT(self, req):  # pylint: disable=invalid-name
         """
         Handles PUT Bucket tagging and PUT Object tagging.
@@ -118,8 +121,8 @@ class TaggingController(Controller):
             req.headers[OBJECT_TAGGING_HEADER] = body
         else:
             req.headers[BUCKET_TAGGING_HEADER] = body
-        resp = req._get_versioned_response(self.app, 'POST',
-                                           req.container_name, req.object_name)
+        resp = req.get_versioned_response(self.app, 'POST',
+                                          req.container_name, req.object_name)
         if resp.status_int == 202:
             headers = dict()
             if req.object_name:
@@ -130,6 +133,7 @@ class TaggingController(Controller):
 
     @public
     @check_container_existence
+    @check_iam_access('s3:DeleteObjectTagging', 's3:DeleteBucketTagging')
     def DELETE(self, req):  # pylint: disable=invalid-name
         """
         Handles DELETE Bucket tagging and DELETE Object tagging.
@@ -139,8 +143,8 @@ class TaggingController(Controller):
             req.headers[OBJECT_TAGGING_HEADER] = ""
         else:
             req.headers[BUCKET_TAGGING_HEADER] = ""
-        resp = req._get_versioned_response(self.app, 'POST',
-                                           req.container_name, req.object_name)
+        resp = req.get_versioned_response(self.app, 'POST',
+                                          req.container_name, req.object_name)
         if resp.status_int == 202:
             headers = dict()
             if req.object_name:

@@ -18,6 +18,7 @@ from swift.common.utils import public
 from swift3.controllers.base import Controller, bucket_operation
 from swift3.etree import Element, SubElement, fromstring, tostring, \
     XMLSyntaxError, DocumentInvalid
+from swift3.iam import check_iam_access
 from swift3.response import HTTPOk, S3NotImplemented, \
     ErrorResponse, MalformedXML, UserKeyMustBeSpecified, AccessDenied, \
     MissingRequestBodyError
@@ -48,6 +49,7 @@ class MultiObjectDeleteController(Controller):
 
     @public
     @bucket_operation
+    @check_iam_access('s3:DeleteObject')
     def POST(self, req):
         """
         Handles Delete Multiple Objects.
@@ -74,10 +76,7 @@ class MultiObjectDeleteController(Controller):
             elem = fromstring(xml, 'Delete')
 
             quiet = elem.find('./Quiet')
-            if quiet is not None and quiet.text.lower() == 'true':
-                self.quiet = True
-            else:
-                self.quiet = False
+            self.quiet = quiet is not None and quiet.text.lower() == 'true'
 
             delete_list = list(object_key_iter(elem))
             if len(delete_list) > CONF.max_multi_delete_objects:

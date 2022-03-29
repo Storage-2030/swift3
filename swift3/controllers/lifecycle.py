@@ -17,9 +17,10 @@ from swift.common.utils import public
 
 from swift3.controllers.base import Controller, bucket_operation
 from swift3.etree import fromstring, DocumentInvalid, XMLSyntaxError
-from swift3.response import HTTPOk, \
+from swift3.iam import check_iam_access
+from swift3.response import HTTPNoContent, HTTPOk, \
     NoSuchLifecycleConfiguration, MalformedXML
-from swift3.utils import sysmeta_header
+from swift3.utils import convert_response, sysmeta_header
 
 
 LIFECYCLE_HEADER = sysmeta_header('container', 'lifecycle')
@@ -38,12 +39,13 @@ class LifecycleController(Controller):
 
     @public
     @bucket_operation(err_resp=NoSuchLifecycleConfiguration)
+    @check_iam_access('s3:GetLifecycleConfiguration')
     def GET(self, req):
         """
         Handles GET Bucket lifecycle.
         """
-        info = req.get_container_info(self.app)
-        body = info['sysmeta'].get('swift3-lifecycle')
+        resp = req.get_response(self.app, method='HEAD')
+        body = resp.sysmeta_headers.get(LIFECYCLE_HEADER)
         if not body:
             raise NoSuchLifecycleConfiguration()
 
@@ -51,6 +53,7 @@ class LifecycleController(Controller):
 
     @public
     @bucket_operation()
+    @check_iam_access('s3:PutLifecycleConfiguration')
     def PUT(self, req):
         """
         Handles PUT Bucket lifecycle.
@@ -63,17 +66,17 @@ class LifecycleController(Controller):
             raise MalformedXML(str(exc))
 
         req.headers[LIFECYCLE_HEADER] = body
-        subreq = req.to_swift_req('POST', req.container_name, None,
-                                  headers=req.headers)
-        return subreq.get_response(self.app)
+        resp = req.get_response(self.app, method='POST')
+        return convert_response(req, resp, 204, HTTPOk)
 
     @public
     @bucket_operation()
+    # No specific permission for DELETE
+    @check_iam_access('s3:PutLifecycleConfiguration')
     def DELETE(self, req):
         """
         Handles DELETE Bucket lifecycle.
         """
         req.headers[LIFECYCLE_HEADER] = ""
-        subreq = req.to_swift_req('POST', req.container_name, None,
-                                  headers=req.headers)
-        return subreq.get_response(self.app)
+        resp = req.get_response(self.app, method='POST')
+        return convert_response(req, resp, 202, HTTPNoContent)
