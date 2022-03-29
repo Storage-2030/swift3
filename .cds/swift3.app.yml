@@ -1,0 +1,7 @@
+version: v1.0
+name: swift3
+vcs_server: stash_ovh_net
+repo: OPENIO/legacy-swift3
+vcs_connection_type: ssh
+vcs_ssh_key: proj-ssh-openio
+vcs_pgp_key: proj-pgp-openio

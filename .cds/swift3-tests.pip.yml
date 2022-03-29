@@ -1,0 +1,43 @@
+version: v.10
+name: swift3-tests
+jobs:
+  - job: Run tests
+    steps:
+
+      - name: Checkout application
+        checkout: '{{ .cds.workspace }}'
+
+      - name: Install dependencies (distribution)
+        script: |+
+          #!/bin/bash
+          set -x
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update -qq
+          sudo apt-get install -y $(tr '\n' ' ' < .cds/deps-ubuntu-bionic.txt)
+          virtualenv -p $(which python) $HOME/swift3env
+          . $HOME/swift3env/bin/activate
+          pip install --upgrade pip setuptools virtualenv tox
+
+      - name: Install dependencies (Openstack)
+        script:
+          - git clone -b "stable/queens" https://github.com/openstack/swift.git
+          - . $HOME/swift3env/bin/activate
+          - cd swift
+          - python setup.py install
+          - pip install --upgrade -r requirements.txt
+          - cd ..
+          - grep -v swift requirements.txt > deps-requirements.txt
+          - pip install --upgrade -r deps-requirements.txt
+          - pip install --upgrade -r test-requirements.txt
+
+      - name: Run tests
+        script:
+          - pgrep rsyslogd || rsyslogd &
+          - sysctl -w kernel.core_pattern='/tmp/core.%p.%E'
+          - ulimit -c unlimited
+          - ulimit -n 8192
+          - . $HOME/swift3env/bin/activate
+          - tox -e "$TEST_SUITE"
+
+    requirements:
+      - model: Ubuntu-18.04-VM-b2-07
