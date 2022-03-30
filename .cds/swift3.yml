@@ -6,6 +6,17 @@ workflow:
     pipeline: swift3-root
     application: swift3
 
+  mirror:
+    pipeline: swift3-mirror
+    application: swift3
+    depends_on:
+      - root
+    conditions:
+      check:
+        - variable: cds.proj.mirror_to_github
+          operator: eq
+          value: "true"
+
   tests-unit:
     pipeline: swift3-tests
     application: swift3
