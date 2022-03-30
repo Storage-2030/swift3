@@ -81,7 +81,8 @@ _setup_keystone()
     local log_file="${LOG_DEST:-${TEST_DIR}/log}/keystone.log"
     mkdir -p "$(dirname "${log_file}")"
 
-    keystone-manage --config-file conf/keystone.conf --debug fernet_setup
+    keystone-manage --config-file conf/keystone.conf --debug fernet_setup \
+        --keystone-user root --keystone-group root
     keystone-manage --config-file conf/keystone.conf --debug db_sync
     keystone-manage --config-file conf/keystone.conf --debug bootstrap \
         --bootstrap-password=$OS_PASSWORD \
